@@ -108,13 +108,41 @@ curl -X POST http://localhost:8000/stress-test \
 ## Docker
 Build and run with Docker:
 ```bash
-docker build -t py-stress-test .
+docker buildx create --use --name multi || docker buildx use multi
+
+docker buildx build --platform linux/amd64 --no-cache -t docker pull ghcr.io/yudipurnama/py-stress-test:v1.0.0 .
 
 docker run --rm -p 8000:8000 py-stress-test
 
 curl http://localhost:8000/health
 ```
 The Docker image uses Gunicorn to serve `stress_test:app`.
+
+### Push to GitHub Container Registry (GHCR)
+
+Manual push from your machine (requires a GHCR PAT):
+```bash
+echo $GHCR_PAT | docker login ghcr.io -u <github-username> --password-stdin
+
+docker buildx create --use --name multi || docker buildx use multi
+docker buildx build \
+  --platform linux/amd64 \
+  --no-cache \
+  -t ghcr.io/yudipurnama/stress-test:latest \
+  -t ghcr.io/yudipurnama/stress-test:$(git rev-parse --short HEAD) \
+  --push .
+```
+
+CI/CD via GitHub Actions:
+- Workflow at `.github/workflows/docker.yml` builds on push to `main` and publishes to `ghcr.io/<owner>/stress-test`.
+- Tags: `latest` (on default branch) and the commit `sha`.
+- Uses the repository `GITHUB_TOKEN` with `packages: write` permission; no extra secrets needed.
+
+Steps:
+1. Push this repo to GitHub: `git@github.com:yudipurnama/stress-test.git`.
+2. Ensure Actions are enabled for the repo.
+3. After a push to `main`, the image will be available at:
+   `https://github.com/yudipurnama/stress-test/pkgs/container/stress-test`.
 
 ## Notes
 - This app is intended for test environments; be mindful not to overload real services.
